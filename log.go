@@ -21,6 +21,18 @@ func newLog(base instanceID) *log {
 	}
 }
 
+func newLogWithInstances(insts ...*proto.Instance) *log {
+	if len(insts) == 0 {
+		return newLog(0)
+	}
+	l := &log{
+		base: instanceID(insts[0].Id),
+	}
+	l.insts = make([]*proto.Instance, len(insts))
+	copy(l.insts, insts)
+	return l
+}
+
 // appendAsLeader appends instances to the log as a leader.
 //
 // The insts are just a list of proposals wrapped as Instance. Only the Value field is used.

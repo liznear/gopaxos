@@ -14,11 +14,13 @@ func defaultConfig() *stateMachineConfig {
 	const (
 		defaultCommitInterval = 5 * time.Second
 		defaultMaxPeersNumber = 9
+		defaultRpcTimeout     = 2 * time.Second
 	)
 	return &stateMachineConfig{
 		paxosConfig: paxosConfig{
 			commitInterval: defaultCommitInterval,
 			maxPeersNumber: defaultMaxPeersNumber,
+			rpcTimeout:     defaultRpcTimeout,
 		},
 		nodes: make(map[NodeID]string),
 	}

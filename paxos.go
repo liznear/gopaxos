@@ -27,6 +27,7 @@ type paxosConfig struct {
 	id             NodeID
 	commitInterval time.Duration
 	maxPeersNumber int64
+	rpcTimeout     time.Duration
 }
 
 type paxosState struct {
@@ -63,7 +64,10 @@ type paxos struct {
 }
 
 func newPaxos(cfg *stateMachineConfig) (*paxos, error) {
-	logger := logrus.WithField("id", cfg.id)
+	logger := logrus.New()
+	if cfg.debug {
+		logger.SetLevel(logrus.DebugLevel)
+	}
 	peers := make(map[NodeID]node, len(cfg.nodes)-1)
 	for id, addr := range cfg.nodes {
 		if id == cfg.id {
@@ -78,7 +82,7 @@ func newPaxos(cfg *stateMachineConfig) (*paxos, error) {
 
 	const bufferSize = 100
 	return &paxos{
-		logger:        logger,
+		logger:        logger.WithField("id", cfg.id),
 		paxosConfig:   cfg.paxosConfig,
 		peers:         peers,
 		paxosState:    newPaxosState(),
@@ -87,4 +91,22 @@ func newPaxos(cfg *stateMachineConfig) (*paxos, error) {
 		acceptCh:      make(chan []*proto.Instance, bufferSize),
 		onCommit:      cfg.executor,
 	}, nil
+}
+
+func (p *paxos) broadcast(ctx context.Context, f func(context.Context, transport) (any, error)) chan any {
+	resps := make(chan any, len(p.peers))
+	for _, peer := range p.peers {
+		peer := peer
+		go func() {
+			rctx, cancel := context.WithTimeout(ctx, p.rpcTimeout)
+			defer cancel()
+			resp, err := f(rctx, peer.trans)
+			if err != nil {
+				p.logger.WithField("peer", peer.id).WithError(err).Errorf("fail to send request")
+				resps <- nil
+			}
+			resps <- resp
+		}()
+	}
+	return resps
 }

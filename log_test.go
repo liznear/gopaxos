@@ -6,6 +6,48 @@ import (
 	"github.com/liznear/gopaxos/proto"
 )
 
+func Test_NewLog(t *testing.T) {
+	t.Parallel()
+	t.Run("empty insts", func(t *testing.T) {
+		t.Parallel()
+		log := newLogWithInstances()
+		if log.base != 0 {
+			t.Errorf("Got base %d, want 0", log.base)
+		}
+		if log.insts != nil {
+			t.Errorf("Got non-nil insts %s, want nil", log)
+		}
+	})
+	t.Run("non-empty insts", func(t *testing.T) {
+		t.Parallel()
+		log := newLogWithInstances(&proto.Instance{Id: 10})
+		if log.base != 10 {
+			t.Errorf("Got base %d, want 10", log.base)
+		}
+		if len(log.insts) != 1 {
+			t.Errorf("Got length %d, want 1", len(log.insts))
+		}
+		if cap(log.insts) != 1 {
+			t.Errorf("Got capacity %d, want 1", cap(log.insts))
+		}
+	})
+	t.Run("insts with larger capacity", func(t *testing.T) {
+		t.Parallel()
+		insts := make([]*proto.Instance, 0, 10)
+		insts = append(insts, &proto.Instance{Id: 10})
+		log := newLogWithInstances(insts...)
+		if log.base != 10 {
+			t.Errorf("Got base %d, want 10", log.base)
+		}
+		if len(log.insts) != 1 {
+			t.Errorf("Got length %d, want 1", len(log.insts))
+		}
+		if cap(log.insts) != 1 {
+			t.Errorf("Got capacity %d, want 1", cap(log.insts))
+		}
+	})
+}
+
 func Test_ExtendLog(t *testing.T) {
 	t.Parallel()
 	testcases := []struct {
