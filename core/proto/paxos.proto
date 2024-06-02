@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+option go_package = "github.com/liznear/gopaxos/core/proto";
+
+service Paxos {
+  rpc Prepare(PrepareRequest) returns (PrepareResponse) {}
+  rpc Accept(AcceptRequest) returns (AcceptResponse) {}
+  rpc Commit(CommitRequest) returns (CommitResponse) {}
+}
+
+message PrepareRequest {
+  int64 ballot = 1;
+}
+
+message PrepareResponse {
+  ReplyType reply_type = 1;
+  int64 ballot = 2;
+  repeated Instance instances = 3;
+}
+
+message AcceptRequest {
+  int64 ballot = 1;
+  repeated Instance instances = 2;
+}
+
+message AcceptResponse {
+  ReplyType reply_type = 1;
+  int64 ballot = 2;
+}
+
+message CommitRequest {
+  int64 ballot = 1;
+  int64 last_executed = 2;
+  int64 global_last_executed = 3;
+}
+
+message CommitResponse {
+  ReplyType reply_type = 1;
+  int64 ballot = 2;
+  int64 last_executed = 3;
+}
+
+enum ReplyType {
+  REPLY_TYPE_UNKNOWN = 0;
+  REPLY_TYPE_OK = 1;
+  REPLY_TYPE_REJECT = 2;
+}
+
+enum State {
+  STATE_MISSING = 0;
+  STATE_COMMITTED = 1;
+  STATE_IN_PROGRESS = 2;
+}
+
+message Instance {
+  int64 id = 1;
+  int64 ballot = 2;
+  bytes value = 3;
+  State state = 4;
+}
