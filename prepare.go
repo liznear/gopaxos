@@ -3,6 +3,7 @@ package gopaxos
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/liznear/gopaxos/proto"
@@ -81,4 +82,47 @@ func (p *paxos) election(ctx context.Context) (bool, error) {
 func nextPrepareBallot(id NodeID, abn, maxPeersNum int64) int64 {
 	rounds := (abn + maxPeersNum) / (maxPeersNum + 1)
 	return (rounds+1)*(maxPeersNum+1) + int64(id)
+}
+
+func mergeLogs(pbn int64, logs []*log) *log {
+	if len(logs) == 0 {
+		return &log{}
+	}
+
+	var base instanceID = math.MaxInt64
+	var maxID instanceID
+	instances := make(map[int64]*proto.Instance)
+	for _, l := range logs {
+		for _, inst := range l.insts {
+			if inst == nil || inst.State == proto.State_STATE_MISSING {
+				continue
+			}
+			if instanceID(inst.Id) < base {
+				base = instanceID(inst.Id)
+			}
+			if instanceID(inst.Id) > maxID {
+				maxID = instanceID(inst.Id)
+			}
+			old, ok := instances[inst.Id]
+			if !ok {
+				instances[inst.Id] = inst
+				continue
+			}
+			if old.State != proto.State_STATE_COMMITTED && old.Ballot < inst.Ballot {
+				instances[inst.Id] = inst
+			}
+		}
+	}
+	if base == math.MaxInt64 {
+		return &log{}
+	}
+
+	insts := make([]*proto.Instance, maxID-base+1)
+	for i := base; i <= maxID; i++ {
+		if inst, ok := instances[int64(i)]; ok {
+			inst.Ballot = pbn
+			insts[i-base] = inst
+		}
+	}
+	return &log{base, insts}
 }

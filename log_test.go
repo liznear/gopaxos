@@ -76,6 +76,7 @@ func Test_ExtendLog(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			log := newLog(tc.base)
@@ -106,12 +107,7 @@ func Test_AppendToLogAsLeader(t *testing.T) {
 			},
 			abn: 1,
 			insts: []*proto.Instance{
-				{
-					Id:     100,
-					Ballot: 200,
-					State:  proto.State_STATE_COMMITTED,
-					Value:  []byte("hello"),
-				},
+				newInstance(100, 200, proto.State_STATE_COMMITTED, []byte("hello")),
 			},
 			expected: &log{
 				base: 0,
@@ -167,6 +163,7 @@ func Test_AppendToLogAsLeader(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			tc.log.appendAsLeader(tc.abn, tc.insts...)
@@ -287,38 +284,18 @@ func Test_AppendToLogAsFollower(t *testing.T) {
 			log: &log{
 				base: 0,
 				insts: []*proto.Instance{
-					{
-						Id:     0,
-						Ballot: 1,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Value:  []byte("hello"),
-					},
+					newInstance(0, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
 				},
 			},
 			insts: []*proto.Instance{
-				{
-					Id:     3,
-					Ballot: 1,
-					State:  proto.State_STATE_COMMITTED,
-					Value:  []byte("world"),
-				},
+				newInstance(3, 1, proto.State_STATE_COMMITTED, []byte("world")),
 			},
 			expected: &log{
 				base: 0,
 				insts: []*proto.Instance{
-					{
-						Id:     0,
-						Ballot: 1,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Value:  []byte("hello"),
-					},
+					newInstance(0, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
 					nil, nil,
-					{
-						Id:     3,
-						Ballot: 1,
-						State:  proto.State_STATE_COMMITTED,
-						Value:  []byte("world"),
-					},
+					newInstance(3, 1, proto.State_STATE_COMMITTED, []byte("world")),
 				},
 			},
 		},
@@ -327,31 +304,16 @@ func Test_AppendToLogAsFollower(t *testing.T) {
 			log: &log{
 				base: 5,
 				insts: []*proto.Instance{
-					{
-						Id:     5,
-						Ballot: 1,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Value:  []byte("hello"),
-					},
+					newInstance(5, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
 				},
 			},
 			insts: []*proto.Instance{
-				{
-					Id:     4,
-					Ballot: 1,
-					State:  proto.State_STATE_COMMITTED,
-					Value:  []byte("world"),
-				},
+				newInstance(4, 1, proto.State_STATE_COMMITTED, []byte("world")),
 			},
 			expected: &log{
 				base: 5,
 				insts: []*proto.Instance{
-					{
-						Id:     5,
-						Ballot: 1,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Value:  []byte("hello"),
-					},
+					newInstance(5, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
 				},
 			},
 		},
@@ -360,54 +322,25 @@ func Test_AppendToLogAsFollower(t *testing.T) {
 			log: &log{
 				base: 5,
 				insts: []*proto.Instance{
-					{
-						Id:     5,
-						Ballot: 1,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Value:  []byte("hello"),
-					},
+					newInstance(5, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
 				},
 			},
 			insts: []*proto.Instance{
-				{
-					Id:     4,
-					Ballot: 1,
-					State:  proto.State_STATE_COMMITTED,
-					Value:  []byte("world"),
-				},
-				{
-					Id:     5,
-					Ballot: 1,
-					State:  proto.State_STATE_COMMITTED,
-					Value:  []byte("say"),
-				},
-				{
-					Id:     6,
-					Ballot: 1,
-					State:  proto.State_STATE_COMMITTED,
-					Value:  []byte("goodbye"),
-				},
+				newInstance(4, 1, proto.State_STATE_COMMITTED, []byte("world")),
+				newInstance(5, 1, proto.State_STATE_COMMITTED, []byte("say")),
+				newInstance(6, 1, proto.State_STATE_COMMITTED, []byte("goodbye")),
 			},
 			expected: &log{
 				base: 5,
 				insts: []*proto.Instance{
-					{
-						Id:     5,
-						Ballot: 1,
-						State:  proto.State_STATE_COMMITTED,
-						Value:  []byte("say"),
-					},
-					{
-						Id:     6,
-						Ballot: 1,
-						State:  proto.State_STATE_COMMITTED,
-						Value:  []byte("goodbye"),
-					},
+					newInstance(5, 1, proto.State_STATE_COMMITTED, []byte("say")),
+					newInstance(6, 1, proto.State_STATE_COMMITTED, []byte("goodbye")),
 				},
 			},
 		},
 	}
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			tc.log.appendAsFollower(tc.insts...)
@@ -415,5 +348,14 @@ func Test_AppendToLogAsFollower(t *testing.T) {
 				t.Errorf("Got %s, want %s", tc.log, tc.expected)
 			}
 		})
+	}
+}
+
+func newInstance(id instanceID, ballot int64, state proto.State, value []byte) *proto.Instance {
+	return &proto.Instance{
+		Id:     int64(id),
+		Ballot: ballot,
+		State:  state,
+		Value:  value,
 	}
 }
