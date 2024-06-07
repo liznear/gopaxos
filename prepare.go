@@ -80,8 +80,12 @@ func (p *paxos) election(ctx context.Context) (bool, error) {
 }
 
 func nextPrepareBallot(id NodeID, abn, maxPeersNum int64) int64 {
-	rounds := (abn + maxPeersNum) / (maxPeersNum + 1)
-	return (rounds+1)*(maxPeersNum+1) + int64(id)
+	if abn == 0 {
+		return int64(id)
+	}
+	prevRound := (abn + maxPeersNum - 1) / (maxPeersNum)
+	round := prevRound + 1
+	return (round-1)*maxPeersNum + int64(id)
 }
 
 func mergeLogs(pbn int64, logs []*log) *log {
