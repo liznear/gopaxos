@@ -26,12 +26,7 @@ func Test_MergeLogs(t *testing.T) {
 				{
 					base: 10,
 					insts: []*proto.Instance{
-						{
-							Id:     10,
-							State:  proto.State_STATE_IN_PROGRESS,
-							Ballot: 1,
-							Value:  []byte("hello"),
-						},
+						newInstance(10, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
 					},
 				},
 			},
@@ -39,12 +34,81 @@ func Test_MergeLogs(t *testing.T) {
 			expected: &log{
 				base: 10,
 				insts: []*proto.Instance{
-					{
-						Id:     10,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Ballot: 2,
-						Value:  []byte("hello"),
+					newInstance(10, 2, proto.State_STATE_IN_PROGRESS, []byte("hello")),
+				},
+			},
+		},
+		{
+			name: "keep committed",
+			logs: []*log{
+				{
+					base: 10,
+					insts: []*proto.Instance{
+						newInstance(10, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
 					},
+				},
+				{
+					base: 10,
+					insts: []*proto.Instance{
+						newInstance(10, 1, proto.State_STATE_COMMITTED, []byte("world")),
+					},
+				},
+			},
+			pbn: 2,
+			expected: &log{
+				base: 10,
+				insts: []*proto.Instance{
+					newInstance(10, 2, proto.State_STATE_COMMITTED, []byte("world")),
+				},
+			},
+		},
+		{
+			name: "keep higher ballot",
+			logs: []*log{
+				{
+					base: 10,
+					insts: []*proto.Instance{
+						newInstance(10, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
+					},
+				},
+				{
+					base: 10,
+					insts: []*proto.Instance{
+						newInstance(10, 2, proto.State_STATE_IN_PROGRESS, []byte("world")),
+					},
+				},
+			},
+			pbn: 3,
+			expected: &log{
+				base: 10,
+				insts: []*proto.Instance{
+					newInstance(10, 3, proto.State_STATE_IN_PROGRESS, []byte("world")),
+				},
+			},
+		},
+		{
+			name: "different bases and gaps",
+			logs: []*log{
+				{
+					base: 10,
+					insts: []*proto.Instance{
+						newInstance(10, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
+					},
+				},
+				{
+					base: 13,
+					insts: []*proto.Instance{
+						newInstance(13, 2, proto.State_STATE_IN_PROGRESS, []byte("world")),
+					},
+				},
+			},
+			pbn: 3,
+			expected: &log{
+				base: 10,
+				insts: []*proto.Instance{
+					newInstance(10, 3, proto.State_STATE_IN_PROGRESS, []byte("hello")),
+					nil, nil, // 11 & 12
+					newInstance(13, 3, proto.State_STATE_IN_PROGRESS, []byte("world")),
 				},
 			},
 		},

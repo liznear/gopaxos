@@ -112,12 +112,7 @@ func Test_AppendToLogAsLeader(t *testing.T) {
 			expected: &log{
 				base: 0,
 				insts: []*proto.Instance{
-					{
-						Id:     0,
-						Ballot: 1,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Value:  []byte("hello"),
-					},
+					newInstance(0, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
 				},
 			},
 		},
@@ -126,38 +121,18 @@ func Test_AppendToLogAsLeader(t *testing.T) {
 			log: &log{
 				base: 0,
 				insts: []*proto.Instance{
-					{
-						Id:     0,
-						Ballot: 1,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Value:  []byte("hello"),
-					},
+					newInstance(0, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
 				},
 			},
 			abn: 2,
 			insts: []*proto.Instance{
-				{
-					Id:     100,
-					Ballot: 200,
-					State:  proto.State_STATE_COMMITTED,
-					Value:  []byte("world"),
-				},
+				newInstance(100, 200, proto.State_STATE_COMMITTED, []byte("world")),
 			},
 			expected: &log{
 				base: 0,
 				insts: []*proto.Instance{
-					{
-						Id:     0,
-						Ballot: 1,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Value:  []byte("hello"),
-					},
-					{
-						Id:     1,
-						Ballot: 2,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Value:  []byte("world"),
-					},
+					newInstance(0, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
+					newInstance(1, 2, proto.State_STATE_IN_PROGRESS, []byte("world")),
 				},
 			},
 		},
@@ -188,22 +163,12 @@ func Test_AppendToLogAsFollower(t *testing.T) {
 				base: 0,
 			},
 			insts: []*proto.Instance{
-				{
-					Id:     0,
-					Ballot: 1,
-					State:  proto.State_STATE_COMMITTED,
-					Value:  []byte("hello"),
-				},
+				newInstance(0, 1, proto.State_STATE_COMMITTED, []byte("hello")),
 			},
 			expected: &log{
 				base: 0,
 				insts: []*proto.Instance{
-					{
-						Id:     0,
-						Ballot: 1,
-						State:  proto.State_STATE_COMMITTED,
-						Value:  []byte("hello"),
-					},
+					newInstance(0, 1, proto.State_STATE_COMMITTED, []byte("hello")),
 				},
 			},
 		},
@@ -212,37 +177,17 @@ func Test_AppendToLogAsFollower(t *testing.T) {
 			log: &log{
 				base: 0,
 				insts: []*proto.Instance{
-					{
-						Id:     0,
-						Ballot: 1,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Value:  []byte("hello"),
-					},
+					newInstance(0, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
 				},
 			},
 			insts: []*proto.Instance{
-				{
-					Id:     1,
-					Ballot: 1,
-					State:  proto.State_STATE_COMMITTED,
-					Value:  []byte("world"),
-				},
+				newInstance(1, 1, proto.State_STATE_IN_PROGRESS, []byte("world")),
 			},
 			expected: &log{
 				base: 0,
 				insts: []*proto.Instance{
-					{
-						Id:     0,
-						Ballot: 1,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Value:  []byte("hello"),
-					},
-					{
-						Id:     1,
-						Ballot: 1,
-						State:  proto.State_STATE_COMMITTED,
-						Value:  []byte("world"),
-					},
+					newInstance(0, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
+					newInstance(1, 1, proto.State_STATE_IN_PROGRESS, []byte("world")),
 				},
 			},
 		},
@@ -251,31 +196,16 @@ func Test_AppendToLogAsFollower(t *testing.T) {
 			log: &log{
 				base: 0,
 				insts: []*proto.Instance{
-					{
-						Id:     0,
-						Ballot: 1,
-						State:  proto.State_STATE_IN_PROGRESS,
-						Value:  []byte("hello"),
-					},
+					newInstance(0, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
 				},
 			},
 			insts: []*proto.Instance{
-				{
-					Id:     0,
-					Ballot: 1,
-					State:  proto.State_STATE_COMMITTED,
-					Value:  []byte("world"),
-				},
+				newInstance(0, 1, proto.State_STATE_COMMITTED, []byte("world")),
 			},
 			expected: &log{
 				base: 0,
 				insts: []*proto.Instance{
-					{
-						Id:     0,
-						Ballot: 1,
-						State:  proto.State_STATE_COMMITTED,
-						Value:  []byte("world"),
-					},
+					newInstance(0, 1, proto.State_STATE_COMMITTED, []byte("world")),
 				},
 			},
 		},

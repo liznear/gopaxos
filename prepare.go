@@ -108,7 +108,10 @@ func mergeLogs(pbn int64, logs []*log) *log {
 				instances[inst.Id] = inst
 				continue
 			}
-			if old.State != proto.State_STATE_COMMITTED && old.Ballot < inst.Ballot {
+			if old.State == proto.State_STATE_COMMITTED {
+				continue
+			}
+			if old.Ballot < inst.Ballot || (old.Ballot == inst.Ballot && inst.State == proto.State_STATE_COMMITTED) {
 				instances[inst.Id] = inst
 			}
 		}
