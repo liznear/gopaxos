@@ -3,6 +3,7 @@ package gopaxos
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/liznear/gopaxos/proto"
 )
@@ -180,23 +181,63 @@ func Test_NextPrepareBallot(t *testing.T) {
 func Test_Election(t *testing.T) {
 	t.Parallel()
 	testcase := []struct {
-		name   string
-		id     NodeID
-		peers  map[NodeID]transport
-		expect bool
-	}{}
+		name      string
+		id        NodeID
+		peers     map[NodeID]transport
+		expectRes bool
+		expectABN int64
+	}{
+		{
+			name: "two rejection node",
+			id:   1,
+			peers: map[NodeID]transport{
+				2: alwaysRejectPrepareFn(10),
+				3: alwaysRejectPrepareFn(10),
+			},
+			expectRes: false,
+			expectABN: 10,
+		},
+		{
+			name: "one unreachable node",
+			id:   1,
+			peers: map[NodeID]transport{
+				2: alwaysOKPrepareFn(nil),
+				3: alwaysFailPrepareFn,
+			},
+			expectRes: true,
+			expectABN: 1,
+		},
+		{
+			// It would win the election but still realized it shouldn't be the leader later.
+			name: "one slow rejection",
+			id:   1,
+			peers: map[NodeID]transport{
+				2: alwaysOKPrepareFn(nil),
+				3: fakePrepareFn(func(ctx context.Context, req *proto.PrepareRequest) (*proto.PrepareResponse, error) {
+					// Assumes this `sleep` makes sure this response arrives later than the node 2.
+					time.Sleep(100 * time.Millisecond)
+					return &proto.PrepareResponse{ReplyType: proto.ReplyType_REPLY_TYPE_REJECT, Ballot: 10}, nil
+				}),
+			},
+			expectRes: true,
+			expectABN: 1,
+		},
+	}
 	for _, tc := range testcase {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			// election
-			p := newTestPaxos(tc.id, map[NodeID]transport{}, noOpExecutor)
+			p := newTestPaxos(tc.id, tc.peers, noOpExecutor)
 			succeed, err := p.election(context.Background())
 			if err != nil {
 				t.Fatalf("fail to elect: %v", err)
 			}
-			if succeed != tc.expect {
-				t.Errorf("Got %v, want %v", succeed, tc.expect)
+			if succeed != tc.expectRes {
+				t.Errorf("Got result %v, want %v", succeed, tc.expectRes)
+			}
+			if p.activeBallot.Load() != tc.expectABN {
+				t.Errorf("Got abn %d, want %d", p.activeBallot.Load(), tc.expectABN)
 			}
 		})
 	}

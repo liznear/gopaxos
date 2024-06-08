@@ -49,6 +49,7 @@ func (p *paxos) election(ctx context.Context) (bool, error) {
 
 	votes := 1
 	logs := []*log{p.log}
+repliesLoop:
 	for count := 0; count < len(p.peers); count++ {
 		select {
 		case <-ctx.Done():
@@ -67,7 +68,7 @@ func (p *paxos) election(ctx context.Context) (bool, error) {
 			votes += 1
 			logs = append(logs, newLogWithInstances(r.Instances...))
 			if votes > len(p.peers)/2 {
-				break
+				break repliesLoop
 			}
 		}
 	}
@@ -76,7 +77,7 @@ func (p *paxos) election(ctx context.Context) (bool, error) {
 	p.acceptCh <- p.log.insts
 	p.enterLeader <- struct{}{}
 	p.logger.WithField("abn", pbn).Debug("I'm the leader now")
-	return false, nil
+	return true, nil
 }
 
 func nextPrepareBallot(id NodeID, abn, maxPeersNum int64) int64 {
