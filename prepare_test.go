@@ -2,10 +2,12 @@ package gopaxos
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/liznear/gopaxos/proto"
+	"golang.org/x/sync/errgroup"
 )
 
 func Test_MergeLogs(t *testing.T) {
@@ -227,7 +229,6 @@ func Test_Election(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			// election
 			p := newTestPaxos(tc.id, tc.peers, noOpExecutor)
 			succeed, err := p.election(context.Background())
 			if err != nil {
@@ -240,5 +241,53 @@ func Test_Election(t *testing.T) {
 				t.Errorf("Got abn %d, want %d", p.activeBallot.Load(), tc.expectABN)
 			}
 		})
+	}
+}
+
+func Test_PrepareLoop_NoElectionWithCommit(t *testing.T) {
+	p := newTestPaxos(1, map[NodeID]transport{
+		2: alwaysOKPrepareFn(nil),
+		3: alwaysOKPrepareFn(nil),
+	}, noOpExecutor)
+
+	// leader was 2, since there is commit message, leader won't change
+	originalABN := int64(2)
+	p.activeBallot.Store(originalABN)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	g := errgroup.Group{}
+	g.Go(func() error { return p.prepareLoop(ctx) })
+	p.commitReceived.Store(true)
+	time.Sleep(4 * p.commitInterval)
+	cancel()
+	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+	if p.activeBallot.Load() != originalABN {
+		t.Errorf("Got abn %d, want 2", p.activeBallot.Load())
+	}
+}
+
+func Test_PrepareLoop_ElectionWithoutCommit(t *testing.T) {
+	p := newTestPaxos(1, map[NodeID]transport{
+		2: alwaysOKPrepareFn(nil),
+		3: alwaysOKPrepareFn(nil),
+	}, noOpExecutor)
+
+	// leader was 2, since there is no commit message, we should start election and become the new leader.
+	originalABN := int64(2)
+	p.activeBallot.Store(originalABN)
+	wantABN := nextPrepareBallot(p.id, originalABN, p.maxPeersNumber)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	g := errgroup.Group{}
+	g.Go(func() error { return p.prepareLoop(ctx) })
+	time.Sleep(4 * p.commitInterval)
+	cancel()
+	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+	if p.activeBallot.Load() != wantABN {
+		t.Errorf("Got abn %d, want %d", p.activeBallot.Load(), wantABN)
 	}
 }

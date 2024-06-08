@@ -2,6 +2,7 @@ package gopaxos
 
 import (
 	"context"
+	"time"
 
 	"github.com/liznear/gopaxos/proto"
 	"github.com/sirupsen/logrus"
@@ -16,9 +17,9 @@ func newTestPaxos(id NodeID, trans map[NodeID]transport, e Executor) *paxos {
 		logger: logrus.New().WithField("id", id),
 		paxosConfig: paxosConfig{
 			id:             id,
-			commitInterval: 10,
+			commitInterval: 100 * time.Millisecond,
 			maxPeersNumber: 3,
-			rpcTimeout:     1,
+			rpcTimeout:     time.Second,
 		},
 		peers:         peers,
 		paxosState:    newPaxosState(),

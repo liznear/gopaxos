@@ -19,23 +19,32 @@ func (p *paxos) prepareLoop(ctx context.Context) error {
 		waitForNextCommit = 3 * p.commitInterval
 	)
 	for {
-		if p.commitReceived.Swap(false) {
-			select {
-			case <-ctx.Done():
-				return fmt.Errorf("paxos: stop prepare loop: %w", ctx.Err())
-			case <-time.After(waitForNextCommit):
+		// Wait a while for the commit messages from a leader.
+		// When a new node joins, it hasn't received a commit messages from the leader. We let it wait.
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("paxos: stop prepare loop: %w", ctx.Err())
+		case <-time.After(waitForNextCommit):
+			if p.commitReceived.Swap(false) {
 				continue
 			}
 		}
-		p.logger.WithField("abn", p.activeBallot.Load()).Debugf("fail to receive commit in time, start election")
 
+		p.logger.WithField("abn", p.activeBallot.Load()).Debugf("fail to receive commit in time, start election")
+		win, err := p.election(ctx)
+		if err != nil {
+			return fmt.Errorf("paxos: fail during election: %w", err)
+		}
+		if !win {
+			continue
+		}
+
+		// Now I'm the leader, we just block here until we become a follower again.
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
-		case <-p.enterLeader:
-			return nil
+			return fmt.Errorf("paxos: stop prepare loop: %w", ctx.Err())
 		case <-p.enterFollower:
-			return nil
+			// do nothing
 		}
 	}
 }
