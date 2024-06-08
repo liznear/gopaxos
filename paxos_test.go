@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liznear/gopaxos/proto"
 	"github.com/sirupsen/logrus"
 )
 
@@ -67,7 +66,7 @@ func newTestPaxos(id NodeID, trans map[NodeID]transport, e Executor) *paxos {
 		paxosState:    newPaxosState(),
 		enterFollower: make(chan struct{}, 1),
 		enterLeader:   make(chan struct{}, 1),
-		acceptCh:      make(chan []*proto.Instance, 10),
+		acceptCh:      make(chan acceptPayload, 10),
 		onCommit:      e,
 	}
 }

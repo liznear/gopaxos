@@ -36,9 +36,9 @@ func newLogWithInstances(insts ...*proto.Instance) *log {
 // appendAsLeader appends instances to the log as a leader.
 //
 // The insts are just a list of proposals wrapped as Instance. Only the Value field is used.
-func (l *log) appendAsLeader(abn int64, insts ...*proto.Instance) {
+func (l *log) appendAsLeader(abn int64, insts ...*proto.Instance) []*proto.Instance {
 	if len(insts) == 0 {
-		return
+		return nil
 	}
 	offset := len(l.insts)
 	l.extend(len(l.insts) + len(insts))
@@ -49,6 +49,7 @@ func (l *log) appendAsLeader(abn int64, insts ...*proto.Instance) {
 		inst.State = proto.State_STATE_IN_PROGRESS
 		l.insts[index] = inst
 	}
+	return l.insts[offset:]
 }
 
 // appendAsFollower appends instances to the log as a follower.
@@ -85,6 +86,21 @@ func (l *log) extend(length int) {
 	newInsts := make([]*proto.Instance, capacity)
 	copy(newInsts, l.insts)
 	l.insts = newInsts
+}
+
+func (l *log) nextInstanceID() instanceID {
+	if len(l.insts) == 0 {
+		return l.base
+	}
+	id := instanceID(l.insts[len(l.insts)-1].Id)
+	if id != l.base+instanceID(len(l.insts)) {
+		panic("log: inconsistent instance ID: " + l.String())
+	}
+	return id + 1
+}
+
+func (l *log) empty() bool {
+	return len(l.insts) == 0
 }
 
 func (l *log) String() string {

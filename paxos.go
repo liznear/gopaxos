@@ -59,7 +59,7 @@ type paxos struct {
 
 	enterFollower chan struct{}
 	enterLeader   chan struct{}
-	acceptCh      chan []*proto.Instance
+	acceptCh      chan acceptPayload
 	onCommit      Executor
 }
 
@@ -88,12 +88,13 @@ func newPaxos(cfg *stateMachineConfig) (*paxos, error) {
 		paxosState:    newPaxosState(),
 		enterFollower: make(chan struct{}, 1),
 		enterLeader:   make(chan struct{}, 1),
-		acceptCh:      make(chan []*proto.Instance, bufferSize),
+		acceptCh:      make(chan acceptPayload, bufferSize),
 		onCommit:      cfg.executor,
 	}, nil
 }
 
 func (p *paxos) broadcast(ctx context.Context, f func(context.Context, transport) (any, error)) chan any {
+	// TODO: handle channel close
 	resps := make(chan any, len(p.peers))
 	for _, peer := range p.peers {
 		peer := peer

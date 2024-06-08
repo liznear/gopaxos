@@ -81,10 +81,13 @@ repliesLoop:
 			}
 		}
 	}
-	p.activeBallot.Store(pbn)
 	p.log = mergeLogs(pbn, logs)
-	p.acceptCh <- p.log.insts
+	if !p.log.empty() {
+		p.acceptCh <- acceptPayload{pbn, [2]instanceID{p.log.base, p.log.nextInstanceID()}}
+	}
 	p.enterLeader <- struct{}{}
+	// Update the pbn after updating all other status.
+	p.activeBallot.Store(pbn)
 	p.logger.WithField("abn", pbn).Debug("I'm the leader now")
 	return true, nil
 }
@@ -147,6 +150,8 @@ func mergeLogs(pbn int64, logs []*log) *log {
 	for i := base; i <= maxID; i++ {
 		if inst, ok := instances[int64(i)]; ok {
 			inst.Ballot = pbn
+			// All these merged logs are marked as "IN_PROGRESS" since they are not committed yet.
+			inst.State = proto.State_STATE_IN_PROGRESS
 			insts[i-base] = inst
 		}
 	}

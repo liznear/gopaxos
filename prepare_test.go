@@ -43,7 +43,7 @@ func Test_MergeLogs(t *testing.T) {
 			},
 		},
 		{
-			name: "keep committed",
+			name: "keep committed but change to in-progress",
 			logs: []*log{
 				{
 					base: 10,
@@ -62,7 +62,7 @@ func Test_MergeLogs(t *testing.T) {
 			expected: &log{
 				base: 10,
 				insts: []*proto.Instance{
-					newInstance(10, 2, proto.State_STATE_COMMITTED, []byte("world")),
+					newInstance(10, 2, proto.State_STATE_IN_PROGRESS, []byte("world")),
 				},
 			},
 		},
