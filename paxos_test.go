@@ -2,11 +2,53 @@ package gopaxos
 
 import (
 	"context"
+	"fmt"
+	"testing"
 	"time"
 
 	"github.com/liznear/gopaxos/proto"
 	"github.com/sirupsen/logrus"
 )
+
+func Test_LeaderID(t *testing.T) {
+	t.Parallel()
+	testcases := []struct {
+		abn           int64
+		maxPeerNumber int64
+		expected      NodeID
+	}{
+		{
+			abn:           0,
+			maxPeerNumber: 3,
+			expected:      0,
+		},
+		{
+			abn:           1,
+			maxPeerNumber: 3,
+			expected:      1,
+		},
+		{
+			abn:           3,
+			maxPeerNumber: 3,
+			expected:      3,
+		},
+		{
+			abn:           13,
+			maxPeerNumber: 3,
+			expected:      1,
+		},
+	}
+	for _, tc := range testcases {
+		tc := tc
+		t.Run(fmt.Sprintf("abn=%d,maxPeerNumber=%d", tc.abn, tc.maxPeerNumber), func(t *testing.T) {
+			t.Parallel()
+			got := leaderID(tc.abn, tc.maxPeerNumber)
+			if got != tc.expected {
+				t.Errorf("Got %d, want %d", got, tc.expected)
+			}
+		})
+	}
+}
 
 func newTestPaxos(id NodeID, trans map[NodeID]transport, e Executor) *paxos {
 	peers := make(map[NodeID]node, len(trans))

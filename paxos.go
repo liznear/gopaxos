@@ -110,3 +110,19 @@ func (p *paxos) broadcast(ctx context.Context, f func(context.Context, transport
 	}
 	return resps
 }
+
+func (p *paxos) currentBallot() (int64, bool) {
+	abn := p.activeBallot.Load()
+	return abn, leaderID(abn, p.maxPeersNumber) == p.id
+}
+
+func leaderID(abn, maxPeersNumber int64) NodeID {
+	if abn == 0 {
+		return 0
+	}
+	id := abn % maxPeersNumber
+	if id != 0 {
+		return NodeID(id)
+	}
+	return NodeID(maxPeersNumber)
+}

@@ -98,6 +98,15 @@ func nextPrepareBallot(id NodeID, abn, maxPeersNum int64) int64 {
 	return (round-1)*maxPeersNum + int64(id)
 }
 
+// mergeLogs merges logs from different nodes when a node becomes a leader.
+//
+// The leader should merge logs from a majority of nodes to get the latest state.
+// Logs from different nodes can have inconsistency, but any log instance with
+// "COMMITTED" state should have the same value (even if the ballot is different), and
+// it would appear in at least one of the logs (since we have a majority of nodes' logs).
+// For any other log instance, we should choose the one with the highest ballot.
+//
+// The returned logs would have the ballot equal to pbn.
 func mergeLogs(pbn int64, logs []*log) *log {
 	if len(logs) == 0 {
 		return &log{}
