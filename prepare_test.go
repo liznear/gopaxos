@@ -1,6 +1,7 @@
 package gopaxos
 
 import (
+	"context"
 	"testing"
 
 	"github.com/liznear/gopaxos/proto"
@@ -171,6 +172,31 @@ func Test_NextPrepareBallot(t *testing.T) {
 			got := nextPrepareBallot(tc.id, tc.abn, tc.maxPeers)
 			if got != tc.expected {
 				t.Errorf("Got %d, want %d", got, tc.expected)
+			}
+		})
+	}
+}
+
+func Test_Election(t *testing.T) {
+	t.Parallel()
+	testcase := []struct {
+		name   string
+		id     NodeID
+		peers  map[NodeID]transport
+		expect bool
+	}{}
+	for _, tc := range testcase {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// election
+			p := newTestPaxos(tc.id, map[NodeID]transport{}, noOpExecutor)
+			succeed, err := p.election(context.Background())
+			if err != nil {
+				t.Fatalf("fail to elect: %v", err)
+			}
+			if succeed != tc.expect {
+				t.Errorf("Got %v, want %v", succeed, tc.expect)
 			}
 		})
 	}
