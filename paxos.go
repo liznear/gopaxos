@@ -112,6 +112,32 @@ func (p *paxos) broadcast(ctx context.Context, f func(context.Context, transport
 	return resps
 }
 
+func (p *paxos) updateBallot(newBallot int64) (old int64, updated bool) {
+	i := 0
+	for {
+		old, wasLeader := p.currentBallot()
+		if old > newBallot {
+			return old, false
+		}
+		if !p.activeBallot.CompareAndSwap(old, newBallot) {
+			// Retry
+			i++
+			if i > 5 {
+				p.logger.WithField("old", old).WithField("new", newBallot).WithField("retry", i).Debug("retry update ballot")
+			}
+		}
+
+		// Updated to new ballot
+		if wasLeader {
+			p.enterFollower <- struct{}{}
+		}
+		if leaderID(newBallot, p.maxPeersNumber) == p.id {
+			p.enterLeader <- struct{}{}
+		}
+		return old, true
+	}
+}
+
 func (p *paxos) currentBallot() (int64, bool) {
 	abn := p.activeBallot.Load()
 	return abn, leaderID(abn, p.maxPeersNumber) == p.id
