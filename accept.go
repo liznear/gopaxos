@@ -8,45 +8,30 @@ import (
 )
 
 func (p *paxos) acceptLoop(ctx context.Context) error {
-	var (
-		abn      int64
-		isLeader bool
-	)
 acceptLoop:
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("paxos: stop accept loop as a follower: %w", ctx.Err())
-		case <-p.enterLeader:
-			// I'm the leader now. Need to start broadcasting accepted instances.
-			abn, isLeader = p.currentBallot()
+			return fmt.Errorf("paxos: stop accept loop: %w", ctx.Err())
+		case payload := <-p.acceptCh: // Normally, there shouldn't be any payload in the channel when the node is not a leader.
+			abn, isLeader := p.currentBallot()
 			if !isLeader {
 				continue acceptLoop
 			}
-			p.logger.WithField("abn", abn).Debug("start accept loop")
-		}
-
-	innerLoop:
-		for {
-			select {
-			case <-ctx.Done():
-				return fmt.Errorf("paxos: stop accept loop as a leader: %w", ctx.Err())
-			case payload := <-p.acceptCh:
-				// Probably payloads from previous terms. Ignore them
-				if payload.abn != abn {
-					p.logger.WithField("abn", abn).WithField("accept_abn", payload.abn).Debug("ignore accept payload")
-					continue innerLoop
-				}
-				// The instances should have been appended to the leader's log.
-				// Broadcast the instances to all peers.
-				accepted, err := p.broadcastAcceptedInstances(ctx, payload)
-				if err != nil {
-					return fmt.Errorf("paxos: fail to broadcast accepted instances: %w", err)
-				}
-				if !accepted {
-					// No longer the leader.
-					break innerLoop
-				}
+			// Probably payloads from previous terms. Ignore them
+			if payload.abn != abn {
+				p.logger.WithField("abn", abn).WithField("accept_abn", payload.abn).Debug("ignore accept payload")
+				continue acceptLoop
+			}
+			// The instances should have been appended to the leader's log.
+			// Broadcast the instances to all peers.
+			accepted, err := p.broadcastAcceptedInstances(ctx, payload)
+			if err != nil {
+				return fmt.Errorf("paxos: fail to broadcast accepted instances: %w", err)
+			}
+			if !accepted {
+				// No longer the leader.
+				continue acceptLoop
 			}
 		}
 	}
@@ -132,11 +117,8 @@ repliesLoop:
 }
 
 func (p *paxos) handleAccept(_ context.Context, req *proto.AcceptRequest) (*proto.AcceptResponse, error) {
-	if req.Ballot < p.activeBallot.Load() {
-		return &proto.AcceptResponse{ReplyType: proto.ReplyType_REPLY_TYPE_REJECT, Ballot: p.activeBallot.Load()}, nil
-	}
-	old, updated := p.updateBallot(req.Ballot)
-	if !updated {
+	old, _ := p.updateBallot(req.Ballot)
+	if old > req.Ballot {
 		return &proto.AcceptResponse{ReplyType: proto.ReplyType_REPLY_TYPE_REJECT, Ballot: old}, nil
 	}
 	p.log.appendAsFollower(req.Instances...)

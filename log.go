@@ -88,6 +88,27 @@ func (l *log) extend(length int) {
 	l.insts = newInsts
 }
 
+// trim remove all instances before gle from the log.
+func (l *log) trim(gle instanceID) {
+	if gle < l.base {
+		return
+	}
+	l.base = gle + 1
+	if gle >= l.base+instanceID(len(l.insts)) {
+		l.insts = nil
+	} else {
+		l.insts = l.insts[gle-l.base+1:]
+	}
+}
+
+func (l *log) indexOf(id instanceID) int {
+	index := int(id - l.base)
+	if index < 0 || index >= len(l.insts) {
+		return -1
+	}
+	return index
+}
+
 func (l *log) nextInstanceID() instanceID {
 	if len(l.insts) == 0 {
 		return l.base

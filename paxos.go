@@ -119,6 +119,9 @@ func (p *paxos) updateBallot(newBallot int64) (old int64, updated bool) {
 		if old > newBallot {
 			return old, false
 		}
+		if old == newBallot {
+			return old, false
+		}
 		if !p.activeBallot.CompareAndSwap(old, newBallot) {
 			// Retry
 			i++
