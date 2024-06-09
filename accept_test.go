@@ -2,6 +2,7 @@ package gopaxos
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -83,6 +84,76 @@ func Test_BroadcastAccept(t *testing.T) {
 			}
 			if p.lastExecuted.Load() != tc.expectLE {
 				t.Errorf("Got le %d, want %d", p.lastExecuted.Load(), tc.expectLE)
+			}
+		})
+	}
+}
+
+func Test_HandleAccept(t *testing.T) {
+	t.Parallel()
+	testcases := []struct {
+		name       string
+		id         NodeID
+		initABN    int64
+		req        *proto.AcceptRequest
+		expectResp *proto.AcceptResponse
+		expectABN  int64
+		expectLog  *log
+	}{
+		{
+			name:    "reject",
+			id:      1,
+			initABN: 2,
+			req: &proto.AcceptRequest{
+				Ballot: 1,
+				Instances: []*proto.Instance{
+					newInstance(0, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
+				},
+			},
+			expectResp: &proto.AcceptResponse{
+				ReplyType: proto.ReplyType_REPLY_TYPE_REJECT,
+				Ballot:    2,
+			},
+			expectABN: 2,
+			expectLog: newLog(0),
+		},
+		{
+			name:    "ok",
+			id:      1,
+			initABN: 2,
+			req: &proto.AcceptRequest{
+				Ballot: 3,
+				Instances: []*proto.Instance{
+					newInstance(0, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
+				},
+			},
+			expectResp: &proto.AcceptResponse{
+				ReplyType: proto.ReplyType_REPLY_TYPE_OK,
+			},
+			expectABN: 3,
+			expectLog: newLogWithInstances(
+				newInstance(0, 1, proto.State_STATE_IN_PROGRESS, []byte("hello")),
+			),
+		},
+	}
+	for _, tc := range testcases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := newTestPaxos(tc.id, nil, noOpExecutor)
+			p.activeBallot.Store(tc.initABN)
+			resp, err := p.handleAccept(context.Background(), tc.req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(resp, tc.expectResp) {
+				t.Errorf("Got reply %s, want %s", resp, tc.expectResp)
+			}
+			if p.activeBallot.Load() != tc.expectABN {
+				t.Errorf("Got abn %d, want %d", p.activeBallot.Load(), tc.expectABN)
+			}
+			if p.log.String() != tc.expectLog.String() {
+				t.Errorf("Got log %v, want %v", p.log, tc.expectLog)
 			}
 		})
 	}

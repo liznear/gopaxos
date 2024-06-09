@@ -131,6 +131,18 @@ repliesLoop:
 	return true, nil
 }
 
+func (p *paxos) handleAccept(_ context.Context, req *proto.AcceptRequest) (*proto.AcceptResponse, error) {
+	if req.Ballot < p.activeBallot.Load() {
+		return &proto.AcceptResponse{ReplyType: proto.ReplyType_REPLY_TYPE_REJECT, Ballot: p.activeBallot.Load()}, nil
+	}
+	old, updated := p.updateBallot(req.Ballot)
+	if !updated {
+		return &proto.AcceptResponse{ReplyType: proto.ReplyType_REPLY_TYPE_REJECT, Ballot: old}, nil
+	}
+	p.log.appendAsFollower(req.Instances...)
+	return &proto.AcceptResponse{ReplyType: proto.ReplyType_REPLY_TYPE_OK}, nil
+}
+
 type acceptPayload struct {
 	abn int64
 	// instsRange is the range of instances to be broadcasted.
