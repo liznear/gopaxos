@@ -63,6 +63,8 @@ type paxos struct {
 	onCommit      Executor
 }
 
+var _ handler = (*paxos)(nil)
+
 func newPaxos(cfg *stateMachineConfig) (*paxos, error) {
 	logger := logrus.New()
 	if cfg.debug {

@@ -28,9 +28,9 @@ func (t *grpcTransport) commit(ctx context.Context, req *proto.CommitRequest) (*
 var _ transport = (*grpcTransport)(nil)
 
 type handler interface {
-	handlePrepare(ctx context.Context, req *proto.PrepareRequest) *proto.PrepareResponse
-	handleAccept(ctx context.Context, req *proto.AcceptRequest) *proto.AcceptResponse
-	handleCommit(ctx context.Context, req *proto.CommitRequest) *proto.CommitResponse
+	handlePrepare(ctx context.Context, req *proto.PrepareRequest) (*proto.PrepareResponse, error)
+	handleAccept(ctx context.Context, req *proto.AcceptRequest) (*proto.AcceptResponse, error)
+	handleCommit(ctx context.Context, req *proto.CommitRequest) (*proto.CommitResponse, error)
 }
 
 type grpcServer struct {
@@ -39,15 +39,15 @@ type grpcServer struct {
 }
 
 func (s *grpcServer) Prepare(ctx context.Context, req *proto.PrepareRequest) (*proto.PrepareResponse, error) {
-	return s.handler.handlePrepare(ctx, req), nil
+	return s.handler.handlePrepare(ctx, req)
 }
 
 func (s *grpcServer) Accept(ctx context.Context, req *proto.AcceptRequest) (*proto.AcceptResponse, error) {
-	return s.handler.handleAccept(ctx, req), nil
+	return s.handler.handleAccept(ctx, req)
 }
 
 func (s *grpcServer) Commit(ctx context.Context, req *proto.CommitRequest) (*proto.CommitResponse, error) {
-	return s.handler.handleCommit(ctx, req), nil
+	return s.handler.handleCommit(ctx, req)
 }
 
 var _ proto.PaxosServer = (*grpcServer)(nil)
