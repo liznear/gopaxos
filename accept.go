@@ -122,11 +122,15 @@ repliesLoop:
 }
 
 func (p *paxos) handleAccept(_ context.Context, req *proto.AcceptRequest) (*proto.AcceptResponse, error) {
+	p.logger.WithField("abn", p.activeBallot.Load()).WithField("req", req.String()).Debug("receiving accept request")
+
 	old, _ := p.updateBallot(req.Ballot)
 	if old > req.Ballot {
+		p.logger.WithField("abn", p.activeBallot.Load()).WithField("req", req.String()).Debug("rejecting accept request")
 		return &proto.AcceptResponse{ReplyType: proto.ReplyType_REPLY_TYPE_REJECT, Ballot: old}, nil
 	}
 	p.log.appendAsFollower(req.Instances...)
+	p.logger.WithField("abn", p.activeBallot.Load()).WithField("log", p.log.String()).Debug("acknowledging accept request")
 	return &proto.AcceptResponse{ReplyType: proto.ReplyType_REPLY_TYPE_OK}, nil
 }
 

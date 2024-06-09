@@ -144,7 +144,7 @@ func (p *paxos) broadcast(ctx context.Context, f func(context.Context, transport
 			defer cancel()
 			resp, err := f(rctx, peer.trans)
 			if err != nil {
-				p.logger.WithField("peer", peer.id).WithError(err).Errorf("fail to send request")
+				p.logger.WithField("peer", peer.id).WithError(err).Warn("fail to send request")
 				resps <- nil
 				return
 			}

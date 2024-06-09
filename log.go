@@ -92,12 +92,12 @@ func (l *log) trim(gle instanceID) {
 	if gle < l.base {
 		return
 	}
-	l.base = gle + 1
 	if gle >= l.base+instanceID(len(l.insts)) {
 		l.insts = nil
 	} else {
 		l.insts = l.insts[gle-l.base+1:]
 	}
+	l.base = gle + 1
 }
 
 func (l *log) indexOf(id instanceID) int {
@@ -124,16 +124,16 @@ func (l *log) empty() bool {
 }
 
 func (l *log) String() string {
-	lines := []string{fmt.Sprintf("Base: %d\n", l.base)}
+	var lines []string
 	var buf []string
 	for i, inst := range l.insts {
 		if inst == nil || inst.State == proto.State_STATE_MISSING {
-			buf = append(buf, fmt.Sprintf("\t[%d]\t%d: STATE_MISSING\n", i, int64(i)+int64(l.base)))
+			buf = append(buf, fmt.Sprintf("[%d]%d: STATE_MISSING", i, int64(i)+int64(l.base)))
 		} else {
 			lines = append(lines, buf...)
 			buf = buf[:0]
-			lines = append(lines, fmt.Sprintf("\t[%d]\t%d: %s, bn=%d, value=%q\n", i, inst.Id, inst.State.String(), inst.Ballot, string(inst.Value)))
+			lines = append(lines, fmt.Sprintf("[%d]%d: %s, bn=%d, value=%q\n", i, inst.Id, inst.State.String(), inst.Ballot, string(inst.Value)))
 		}
 	}
-	return strings.Join(lines, "\n")
+	return fmt.Sprintf("Base: %d; {%s}", l.base, strings.Join(lines, "; "))
 }

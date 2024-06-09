@@ -13,10 +13,10 @@ func (p *paxos) commitLoop(ctx context.Context) error {
 	var (
 		abn      int64
 		isLeader bool
-		timer    = time.NewTimer(p.commitInterval)
+		ticker   = time.NewTicker(p.commitInterval)
 	)
 
-	timer.Stop()
+	ticker.Stop()
 outerLoop:
 	for {
 		select {
@@ -28,24 +28,31 @@ outerLoop:
 				continue outerLoop
 			}
 			p.logger.WithField("abn", abn).Debug("I'm the leader now. Start committing loop")
-			timer.Reset(p.commitInterval)
+			ticker.Reset(p.commitInterval)
 		}
 
 	innerLoop:
 		for {
+			abn, isLeader := p.currentBallot()
+			if !isLeader {
+				p.logger.WithField("abn", abn).Debug("no longer the leader")
+				break innerLoop
+			}
+			committed, err := p.broadcastCommit(ctx, abn)
+			if err != nil {
+				return fmt.Errorf("paxos: fail to commit: %w", err)
+			}
+			if !committed {
+				// No longer the leader
+				ticker.Stop()
+				break innerLoop
+			}
+
 			select {
 			case <-ctx.Done():
 				return fmt.Errorf("paxos: stop commit loop as a leader: %w", ctx.Err())
-			case <-timer.C:
-				committed, err := p.broadcastCommit(ctx, abn)
-				if err != nil {
-					return fmt.Errorf("paxos: fail to commit: %w", err)
-				}
-				if !committed {
-					// No longer the leader
-					timer.Stop()
-					break innerLoop
-				}
+			case <-ticker.C:
+				continue innerLoop
 			}
 		}
 	}
@@ -93,15 +100,18 @@ func (p *paxos) broadcastCommit(ctx context.Context, abn int64) (committed bool,
 
 func (p *paxos) handleCommit(_ context.Context, req *proto.CommitRequest) (*proto.CommitResponse, error) {
 	p.logger.WithField("abn", p.activeBallot.Load()).WithField("req", req.String()).Debug("receiving commit request")
+
 	old, _ := p.updateBallot(req.Ballot)
 	if old > req.Ballot {
 		return &proto.CommitResponse{ReplyType: proto.ReplyType_REPLY_TYPE_REJECT, Ballot: old}, nil
 	}
 
+	p.commitReceived.Store(true)
 	p.log.trim(instanceID(req.GlobalLastExecuted))
 
 	le := p.lastExecuted.Load()
-	start := p.log.indexOf(instanceID(le))
+	start := p.log.indexOf(instanceID(le + 1))
+	p.logger.WithField("abn", p.activeBallot.Load()).WithField("local_le", le).WithField("start", start).WithField("log", p.log.String()).Debug("Executing from local last executed")
 	if start < 0 {
 		return &proto.CommitResponse{ReplyType: proto.ReplyType_REPLY_TYPE_OK, LastExecuted: p.lastExecuted.Load()}, nil
 	}
@@ -114,7 +124,7 @@ func (p *paxos) handleCommit(_ context.Context, req *proto.CommitRequest) (*prot
 		if err := p.onCommit.Execute(context.Background(), inst.Value); err != nil {
 			p.logger.WithField("abn", req.Ballot).WithField("inst", inst.Id).WithError(err).Error("fail to execute committed instance")
 		}
-		le++
+		le = inst.Id
 	}
 	p.lastExecuted.Store(le)
 	return &proto.CommitResponse{ReplyType: proto.ReplyType_REPLY_TYPE_OK, LastExecuted: p.lastExecuted.Load()}, nil
