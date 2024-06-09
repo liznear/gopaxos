@@ -3,6 +3,7 @@ package gopaxos
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/liznear/gopaxos/proto"
 )
@@ -70,7 +71,7 @@ repliesLoop:
 		case <-ctx.Done():
 			return
 		case resp := <-resps:
-			if resp == nil {
+			if resp == nil || reflect.ValueOf(resp).IsNil() {
 				// Skip peers we fail to connect to
 				continue
 			}
@@ -90,6 +91,10 @@ repliesLoop:
 				break repliesLoop
 			}
 		}
+	}
+
+	if votes <= len(p.peers)/2 {
+		return false, nil
 	}
 
 	// Reach quorum for the logs. Mark them as committed and also execute them.

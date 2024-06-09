@@ -8,6 +8,7 @@ import (
 
 	"github.com/liznear/gopaxos/proto"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 type NodeID int
@@ -26,7 +27,7 @@ type node struct {
 type paxosConfig struct {
 	id             NodeID
 	commitInterval time.Duration
-	maxPeersNumber int64
+	maxNodesNumber int64
 	rpcTimeout     time.Duration
 }
 
@@ -67,6 +68,11 @@ var _ handler = (*paxos)(nil)
 
 func newPaxos(cfg *stateMachineConfig) (*paxos, error) {
 	logger := logrus.New()
+	formatter := &logrus.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: time.RFC3339,
+	}
+	logger.SetFormatter(formatter)
 	if cfg.debug {
 		logger.SetLevel(logrus.DebugLevel)
 	}
@@ -95,6 +101,39 @@ func newPaxos(cfg *stateMachineConfig) (*paxos, error) {
 	}, nil
 }
 
+func (p *paxos) start(ctx context.Context) error {
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		return p.prepareLoop(ctx)
+	})
+	g.Go(func() error {
+		return p.acceptLoop(ctx)
+	})
+	g.Go(func() error {
+		return p.commitLoop(ctx)
+	})
+	return g.Wait()
+}
+
+func (p *paxos) propose(ctx context.Context, value []byte) error {
+	abn, isLeader := p.currentBallot()
+	if !isLeader {
+		return fmt.Errorf("paxos: not the leader")
+	}
+	inst := &proto.Instance{
+		Value: value,
+		State: proto.State_STATE_IN_PROGRESS,
+	}
+	p.log.appendAsLeader(abn, inst)
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("paxos: stop propose: %w", ctx.Err())
+	case p.acceptCh <- acceptPayload{abn, [2]instanceID{instanceID(inst.Id), instanceID(inst.Id + 1)}}:
+		// do nothing
+	}
+	return nil
+}
+
 func (p *paxos) broadcast(ctx context.Context, f func(context.Context, transport) (any, error)) chan any {
 	// TODO: handle channel close
 	resps := make(chan any, len(p.peers))
@@ -107,6 +146,7 @@ func (p *paxos) broadcast(ctx context.Context, f func(context.Context, transport
 			if err != nil {
 				p.logger.WithField("peer", peer.id).WithError(err).Errorf("fail to send request")
 				resps <- nil
+				return
 			}
 			resps <- resp
 		}()
@@ -136,7 +176,7 @@ func (p *paxos) updateBallot(newBallot int64) (old int64, updated bool) {
 		if wasLeader {
 			p.enterFollower <- struct{}{}
 		}
-		if leaderID(newBallot, p.maxPeersNumber) == p.id {
+		if leaderID(newBallot, p.maxNodesNumber) == p.id {
 			p.enterLeader <- struct{}{}
 		}
 		return old, true
@@ -145,7 +185,7 @@ func (p *paxos) updateBallot(newBallot int64) (old int64, updated bool) {
 
 func (p *paxos) currentBallot() (int64, bool) {
 	abn := p.activeBallot.Load()
-	return abn, leaderID(abn, p.maxPeersNumber) == p.id
+	return abn, leaderID(abn, p.maxNodesNumber) == p.id
 }
 
 func leaderID(abn, maxPeersNumber int64) NodeID {

@@ -3,6 +3,7 @@ package gopaxos
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/liznear/gopaxos/proto"
@@ -66,7 +67,7 @@ func (p *paxos) broadcastCommit(ctx context.Context, abn int64) (committed bool,
 		case <-ctx.Done():
 			return false, fmt.Errorf("paxos: stop commit loop while waiting for response: %w", ctx.Err())
 		case resp := <-resps:
-			if resp == nil {
+			if resp == nil || reflect.ValueOf(resp).IsNil() {
 				// Skip peers we fail to connect to
 				continue
 			}
@@ -91,13 +92,19 @@ func (p *paxos) broadcastCommit(ctx context.Context, abn int64) (committed bool,
 }
 
 func (p *paxos) handleCommit(_ context.Context, req *proto.CommitRequest) (*proto.CommitResponse, error) {
+	p.logger.WithField("abn", p.activeBallot.Load()).WithField("req", req.String()).Debug("receiving commit request")
 	old, _ := p.updateBallot(req.Ballot)
 	if old > req.Ballot {
 		return &proto.CommitResponse{ReplyType: proto.ReplyType_REPLY_TYPE_REJECT, Ballot: old}, nil
 	}
 
+	p.log.trim(instanceID(req.GlobalLastExecuted))
+
 	le := p.lastExecuted.Load()
 	start := p.log.indexOf(instanceID(le))
+	if start < 0 {
+		return &proto.CommitResponse{ReplyType: proto.ReplyType_REPLY_TYPE_OK, LastExecuted: p.lastExecuted.Load()}, nil
+	}
 	for i := start; i < len(p.log.insts); i++ {
 		inst := p.log.insts[i]
 		if inst == nil || inst.Id > req.LastExecuted {

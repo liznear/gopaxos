@@ -36,9 +36,9 @@ func newLogWithInstances(insts ...*proto.Instance) *log {
 // appendAsLeader appends instances to the log as a leader.
 //
 // The insts are just a list of proposals wrapped as Instance. Only the Value field is used.
-func (l *log) appendAsLeader(abn int64, insts ...*proto.Instance) []*proto.Instance {
+func (l *log) appendAsLeader(abn int64, insts ...*proto.Instance) {
 	if len(insts) == 0 {
-		return nil
+		return
 	}
 	offset := len(l.insts)
 	l.extend(len(l.insts) + len(insts))
@@ -49,7 +49,6 @@ func (l *log) appendAsLeader(abn int64, insts ...*proto.Instance) []*proto.Insta
 		inst.State = proto.State_STATE_IN_PROGRESS
 		l.insts[index] = inst
 	}
-	return l.insts[offset:]
 }
 
 // appendAsFollower appends instances to the log as a follower.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"reflect"
 	"time"
 
 	"github.com/liznear/gopaxos/proto"
@@ -50,7 +51,8 @@ func (p *paxos) prepareLoop(ctx context.Context) error {
 }
 
 func (p *paxos) election(ctx context.Context) (bool, error) {
-	pbn := nextPrepareBallot(p.id, p.activeBallot.Load(), p.maxPeersNumber)
+	pbn := nextPrepareBallot(p.id, p.activeBallot.Load(), p.maxNodesNumber)
+	p.logger.WithField("abn", p.activeBallot.Load()).WithField("pbn", pbn).Debug("sending prepare requests")
 	req := &proto.PrepareRequest{Ballot: pbn}
 	resps := p.broadcast(ctx, func(ctx context.Context, t transport) (any, error) {
 		return t.prepare(ctx, req)
@@ -64,7 +66,7 @@ repliesLoop:
 		case <-ctx.Done():
 			return false, ctx.Err()
 		case resp := <-resps:
-			if resp == nil {
+			if resp == nil || reflect.ValueOf(resp).IsNil() {
 				// Skip peers we fail to connect to
 				continue
 			}
@@ -76,11 +78,16 @@ repliesLoop:
 			}
 			votes += 1
 			logs = append(logs, newLogWithInstances(r.Instances...))
+			p.logger.WithField("abn", p.activeBallot.Load()).WithField("pbn", pbn).WithField("votes", votes).Debug("Get votes")
 			if votes > len(p.peers)/2 {
 				break repliesLoop
 			}
 		}
 	}
+	if votes <= len(p.peers)/2 {
+		return false, nil
+	}
+
 	p.log = mergeLogs(pbn, logs)
 	if !p.log.empty() {
 		p.acceptCh <- acceptPayload{pbn, [2]instanceID{p.log.base, p.log.nextInstanceID()}}
@@ -93,6 +100,7 @@ repliesLoop:
 }
 
 func (p *paxos) handlePrepare(_ context.Context, req *proto.PrepareRequest) (*proto.PrepareResponse, error) {
+	p.logger.WithField("abn", p.activeBallot.Load()).WithField("req", req.String()).Debug("receiving prepare requests")
 	if req.Ballot < p.activeBallot.Load() {
 		return &proto.PrepareResponse{ReplyType: proto.ReplyType_REPLY_TYPE_REJECT, Ballot: p.activeBallot.Load()}, nil
 	}
@@ -100,6 +108,7 @@ func (p *paxos) handlePrepare(_ context.Context, req *proto.PrepareRequest) (*pr
 	if !updated {
 		return &proto.PrepareResponse{ReplyType: proto.ReplyType_REPLY_TYPE_REJECT, Ballot: old}, nil
 	}
+	p.logger.WithField("abn", p.activeBallot.Load()).Debug("acknowledge prepare request")
 	return &proto.PrepareResponse{ReplyType: proto.ReplyType_REPLY_TYPE_OK, Instances: p.log.insts}, nil
 }
 

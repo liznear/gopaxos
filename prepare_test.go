@@ -278,7 +278,7 @@ func Test_PrepareLoop_ElectionWithoutCommit(t *testing.T) {
 	// leader was 2, since there is no commit message, we should start election and become the new leader.
 	originalABN := int64(2)
 	p.activeBallot.Store(originalABN)
-	wantABN := nextPrepareBallot(p.id, originalABN, p.maxPeersNumber)
+	wantABN := nextPrepareBallot(p.id, originalABN, p.maxNodesNumber)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	g := errgroup.Group{}

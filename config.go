@@ -13,13 +13,13 @@ type stateMachineConfig struct {
 func defaultConfig() *stateMachineConfig {
 	const (
 		defaultCommitInterval = 5 * time.Second
-		defaultMaxPeersNumber = 9
+		defaultMaxNodesNumber = 9
 		defaultRpcTimeout     = 2 * time.Second
 	)
 	return &stateMachineConfig{
 		paxosConfig: paxosConfig{
 			commitInterval: defaultCommitInterval,
-			maxPeersNumber: defaultMaxPeersNumber,
+			maxNodesNumber: defaultMaxNodesNumber,
 			rpcTimeout:     defaultRpcTimeout,
 		},
 		nodes: make(map[NodeID]string),
@@ -63,9 +63,9 @@ func WithCommitInterval(d time.Duration) StateMachineOption {
 	}
 }
 
-func WithMaxPeers(n int) StateMachineOption {
+func WithMaxNodes(n int) StateMachineOption {
 	return func(config *stateMachineConfig) error {
-		config.maxPeersNumber = int64(n)
+		config.maxNodesNumber = int64(n)
 		return nil
 	}
 }

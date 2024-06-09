@@ -59,7 +59,7 @@ func newTestPaxos(id NodeID, trans map[NodeID]transport, e Executor) *paxos {
 		paxosConfig: paxosConfig{
 			id:             id,
 			commitInterval: 100 * time.Millisecond,
-			maxPeersNumber: 3,
+			maxNodesNumber: 3,
 			rpcTimeout:     time.Second,
 		},
 		peers:         peers,
