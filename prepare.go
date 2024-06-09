@@ -92,6 +92,17 @@ repliesLoop:
 	return true, nil
 }
 
+func (p *paxos) handlePrepare(_ context.Context, req *proto.PrepareRequest) (*proto.PrepareResponse, error) {
+	if req.Ballot < p.activeBallot.Load() {
+		return &proto.PrepareResponse{ReplyType: proto.ReplyType_REPLY_TYPE_REJECT, Ballot: p.activeBallot.Load()}, nil
+	}
+	old, updated := p.updateBallot(req.Ballot)
+	if !updated {
+		return &proto.PrepareResponse{ReplyType: proto.ReplyType_REPLY_TYPE_REJECT, Ballot: old}, nil
+	}
+	return &proto.PrepareResponse{ReplyType: proto.ReplyType_REPLY_TYPE_OK, Instances: p.log.insts}, nil
+}
+
 func nextPrepareBallot(id NodeID, abn, maxPeersNum int64) int64 {
 	if abn == 0 {
 		return int64(id)
